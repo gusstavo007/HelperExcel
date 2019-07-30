@@ -1,0 +1,315 @@
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Data;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Web;
+using System.Xml;
+using OfficeOpenXml;
+using RecaudoTercerosWeb.Controllers;
+using UtilitarioCrk;
+
+namespace RecaudoTercerosWeb.Models
+{
+    public class HelperExcel
+    {
+
+
+        private static int NUMERO_COLUMNAS_EXCEL_TXT = 8;
+        private static int NUMERO_COLUMNAS_EXCEL_TXT_DEUDA = 9;
+
+        #region Helper Clientes
+        ////        
+        /*
+         * GenerarArchivoXml
+         *   => Método que nos permite generar un archivo XML          
+         *   => retorna una ruta de tipo string del archivo generado el tamaño es estatico
+         *   => una vez generado el archivo puede ser usado en el WS para la insert en la BD
+         */
+        public static string GenerarArchivoXml(HttpPostedFileBase fileUpload)
+        {
+            string sRuta = ConfigurationManager.AppSettings["RutaFileXml"];
+            string sArchivo = String.Concat("Recaudo_Xml_", DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss_fff"), ".xml");
+            try
+            {
+
+                /**************************************************************/
+                ExcelPackage package = new ExcelPackage(fileUpload.InputStream);
+                var dtDatosExcel = ExcelPackageConvertToDataTable(package);
+
+                XmlDocument CadenaXML = new XmlDocument();
+                //Abre la primera Rama.
+                XmlElement root = CadenaXML.CreateElement("root");
+                CadenaXML.AppendChild(root);
+
+                foreach (DataRow dr in dtDatosExcel.Rows)
+                {
+                    XmlElement xmlParametrosAccion = CadenaXML.CreateElement("Recaudo");
+                    xmlParametrosAccion.SetAttribute("sParametro1", dr.ItemArray[0].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro2", dr.ItemArray[1].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro3", dr.ItemArray[2].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro4", dr.ItemArray[3].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro5", dr.ItemArray[4].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro6", dr.ItemArray[5].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro7", dr.ItemArray[6].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro8", dr.ItemArray[7].ToString());
+                    
+                    
+                    root.AppendChild(xmlParametrosAccion);
+                }
+                
+
+                CadenaXML.Save(Path.Combine(sRuta, sArchivo));
+            }
+            catch (Exception ex)
+            {                
+                throw (ex);
+            }
+
+            return Path.Combine(sRuta, sArchivo);
+
+        }
+        /////       
+         /*
+         * Método que converte un ExcelPackage  en DataTable
+         * **=> En la linea foreach (var firstRowCell in workSheet.Cells[1, 1, 1, 4])
+         *   => el último parametro es la dimensión de la columnas del excel
+         *   => no se considera la primera fila por que es el header del archivo.
+         */
+        
+        public static DataTable ExcelPackageConvertToDataTable(ExcelPackage package)
+        {
+            ExcelWorksheet workSheet = package.Workbook.Worksheets.First();
+            DataTable dtTable = new DataTable();
+            foreach (var firstRowCell in workSheet.Cells[1, 1, 1, NUMERO_COLUMNAS_EXCEL_TXT]) 
+            {
+                dtTable.Columns.Add(firstRowCell.Text);
+            }
+            for (var rowNumber = 2; rowNumber <= workSheet.Dimension.End.Row; rowNumber++)
+            {
+                var row = workSheet.Cells[rowNumber, 1, rowNumber, NUMERO_COLUMNAS_EXCEL_TXT];
+                var newRow = dtTable.NewRow();
+                foreach (var cell in row)
+                {
+                    newRow[cell.Start.Column - 1] = cell.Text;
+                }
+                dtTable.Rows.Add(newRow);
+            }
+            return dtTable;
+        }
+
+        /*
+         * usamos el helper para Generar xml a partir de un archivo txt
+         * GenerarArchivoXmlFromTxt (parms) como parametro la ruta del archivo
+         * ConvertToDataTable (,) como parametro ruta del archivo, numero de columnas del archivo
+         */
+        public static string GenerarArchivoXmlFromTxt(string filePath)
+        {
+            string sRuta = ConfigurationManager.AppSettings["RutaFileXml"];
+            string sArchivo = String.Concat("Recaudo_Xml_", DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss_fff"), ".xml");
+            try
+            {
+
+                var dtDatosTxt = ConvertToDataTable(filePath, NUMERO_COLUMNAS_EXCEL_TXT);
+
+                XmlDocument CadenaXML = new XmlDocument();
+                //Abre la primera Rama.
+                XmlElement root = CadenaXML.CreateElement("root");
+                CadenaXML.AppendChild(root);
+
+                foreach (DataRow dr in dtDatosTxt.Rows)
+                {
+                    XmlElement xmlParametrosAccion = CadenaXML.CreateElement("Recaudo");
+                    xmlParametrosAccion.SetAttribute("sParametro1", dr.ItemArray[0].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro2", dr.ItemArray[1].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro3", dr.ItemArray[2].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro4", dr.ItemArray[3].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro5", dr.ItemArray[4].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro6", dr.ItemArray[5].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro7", dr.ItemArray[6].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro8", dr.ItemArray[7].ToString());                    
+                    
+                    root.AppendChild(xmlParametrosAccion);
+                }
+
+
+                CadenaXML.Save(Path.Combine(sRuta, sArchivo));
+            }
+            catch (Exception ex)
+            {
+                throw (ex);
+            }
+
+            return Path.Combine(sRuta, sArchivo);
+
+        }
+        public static DataTable ConvertToDataTable(string filePath, int numberOfColumns)
+        {
+            DataTable tbl = new DataTable();
+
+            for (int col = 0; col < numberOfColumns; col++)
+                tbl.Columns.Add(new DataColumn("Column" + (col + 1).ToString()));
+
+
+            string[] lines = System.IO.File.ReadAllLines(filePath);
+
+            foreach (string line in lines)
+            {
+                var cols = line.Split(',');
+
+                DataRow dr = tbl.NewRow();
+                for (int cIndex = 0; cIndex < NUMERO_COLUMNAS_EXCEL_TXT; cIndex++)
+                {
+                    dr[cIndex] = cols[cIndex];
+                }
+
+                tbl.Rows.Add(dr);
+            }
+
+            return tbl;
+        }
+        #endregion
+
+        #region Helper Deuda
+        public static string GenerarArchivoDeudaExcelToXml(HttpPostedFileBase fileUpload)
+        {
+            string sRuta = ConfigurationManager.AppSettings["RutaFileXml"];
+
+            string sArchivo = String.Concat("Recaudo_Xml_", DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss_fff"), ".xml");
+            try
+            {
+                
+
+    
+
+                ExcelPackage package = new ExcelPackage(fileUpload.InputStream);
+                var dtDatosExcel = ExcelPackageDTDeuda(package);
+              
+
+                XmlDocument CadenaXML = new XmlDocument();
+                //Abre la primera Rama.
+                XmlElement root = CadenaXML.CreateElement("root");
+                CadenaXML.AppendChild(root);
+
+                foreach (DataRow dr in dtDatosExcel.Rows)
+                {
+                    XmlElement xmlParametrosAccion = CadenaXML.CreateElement("Recaudo");
+                    xmlParametrosAccion.SetAttribute("sParametro1", dr.ItemArray[0].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro2", dr.ItemArray[1].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro3", dr.ItemArray[2].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro4", dr.ItemArray[3].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro5", dr.ItemArray[4].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro6", dr.ItemArray[5].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro7", dr.ItemArray[6].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro8", dr.ItemArray[7].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro9", dr.ItemArray[8].ToString());
+
+
+                    root.AppendChild(xmlParametrosAccion);
+                }
+
+
+                CadenaXML.Save(Path.Combine(sRuta, sArchivo));
+            }
+            catch (Exception ex)
+            {
+                throw (ex);
+            }
+
+            return Path.Combine(sRuta, sArchivo);
+
+        }
+        public static DataTable ExcelPackageDTDeuda(ExcelPackage package)
+        {
+            ExcelWorksheet workSheet = package.Workbook.Worksheets.First();
+            DataTable dtTable = new DataTable();
+            foreach (var firstRowCell in workSheet.Cells[1, 1, 1, NUMERO_COLUMNAS_EXCEL_TXT_DEUDA])
+            {
+                dtTable.Columns.Add(firstRowCell.Text);
+            }
+            for (var rowNumber = 2; rowNumber <= workSheet.Dimension.End.Row; rowNumber++)
+            {
+                var row = workSheet.Cells[rowNumber, 1, rowNumber, NUMERO_COLUMNAS_EXCEL_TXT_DEUDA];
+                var newRow = dtTable.NewRow();
+                foreach (var cell in row)
+                {
+                    newRow[cell.Start.Column - 1] = cell.Text;
+                }
+                dtTable.Rows.Add(newRow);
+            }
+            return dtTable;
+        }
+
+        /*txt*/
+        public static string GenerarArchivoDeudaTxtToXml(string filePath)
+        {
+            string sRuta = ConfigurationManager.AppSettings["RutaFileXml"];
+            string sArchivo = String.Concat("Recaudo_Xml_", DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss_fff"), ".xml");
+            try
+            {
+
+                var dtDatosTxt = ConvertToDataTableDeuda(filePath, NUMERO_COLUMNAS_EXCEL_TXT_DEUDA);
+
+                XmlDocument CadenaXML = new XmlDocument();
+                //Abre la primera Rama.
+                XmlElement root = CadenaXML.CreateElement("root");
+                CadenaXML.AppendChild(root);
+
+                foreach (DataRow dr in dtDatosTxt.Rows)
+                {
+                    XmlElement xmlParametrosAccion = CadenaXML.CreateElement("Recaudo");
+                    xmlParametrosAccion.SetAttribute("sParametro1", dr.ItemArray[0].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro2", dr.ItemArray[1].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro3", dr.ItemArray[2].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro4", dr.ItemArray[3].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro5", dr.ItemArray[4].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro6", dr.ItemArray[5].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro7", dr.ItemArray[6].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro8", dr.ItemArray[7].ToString());
+                    xmlParametrosAccion.SetAttribute("sParametro9", dr.ItemArray[8].ToString());
+
+                    root.AppendChild(xmlParametrosAccion);
+                }
+
+
+                CadenaXML.Save(Path.Combine(sRuta, sArchivo));
+            }
+            catch (Exception ex)
+            {
+                throw (ex);
+            }
+
+            return Path.Combine(sRuta, sArchivo);
+
+        }
+        public static DataTable ConvertToDataTableDeuda(string filePath, int numberOfColumns)
+        {
+            DataTable tbl = new DataTable();
+
+            for (int col = 0; col < numberOfColumns; col++)
+                tbl.Columns.Add(new DataColumn("Column" + (col + 1).ToString()));
+
+
+            string[] lines = System.IO.File.ReadAllLines(filePath);
+
+            foreach (string line in lines)
+            {
+                var cols = line.Split(',');
+
+                DataRow dr = tbl.NewRow();
+                for (int cIndex = 0; cIndex < NUMERO_COLUMNAS_EXCEL_TXT_DEUDA; cIndex++)
+                {
+                    dr[cIndex] = cols[cIndex];
+                }
+
+                tbl.Rows.Add(dr);
+            }
+
+            return tbl;
+        }
+
+        #endregion
+    }
+}
