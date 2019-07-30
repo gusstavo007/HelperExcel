@@ -9,4 +9,14 @@ para ser leido desde el backend.
 
 su usa esta forma de pasar información para exchivos de grandes cantidades de datos.
 
+## Ejemplo
+
+    public ActionResult CargarArchivo(HttpPostedFileBase txtArchivo)
+       var ruta = "";   
+
+
+        if (extension == "xlxs" || extension == "csv" || extension == "xlsx" || extension == "xls")
+            ruta = HelperExcel.GenerarArchivoXml(txtArchivo);
+            }
+
 
